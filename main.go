@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/go-telegram-bot-api"
+	"google.golang.org/appengine"
 	"log"
 	"strconv"
 	"strings"
@@ -36,6 +37,7 @@ var Quizes []Quiz
 var Questions []Question
 
 func main(){
+	appengine.Main()
 	bot,err:=tgbotapi.NewBotAPI("504794894:AAEFMJO23cydExR-aZ02SMCSLABbsjcdq-8")
 	if err!=nil{
 		log.Panic(err)
