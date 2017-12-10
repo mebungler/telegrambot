@@ -10,12 +10,14 @@ import (
 	"math/rand"
 	"fmt"
 	"time"
+	"net/http"
 )
-
+//var db *sql.DB
 type Destination struct {
 	Location 	tgbotapi.Location
 	Name 		string
 }
+
 type Question struct{
 	Question string
 	answerOne string
@@ -32,6 +34,13 @@ type Quiz struct{
 	NumberOfQuestions int
 }
 
+type AnswerData struct{
+	QuizIndex 		int		`json:"quiz_index"`
+	QuestionIndex	int		`json:"question_index"`
+	AnswerIndex		int		`json:"answer_index"`
+}
+
+//TODO:All these should be stored on database
 var locations []Destination
 var Quizes []Quiz
 var Questions []Question
@@ -44,9 +53,12 @@ func main(){
 	}
 	chosenMaterial:=-1
 	bot.Debug = true
-	u:=tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-	updates, err:=bot.GetUpdatesChan(u)
+	_, err = bot.SetWebhook(tgbotapi.NewWebhookWithCert("https://www.google.com:8443/"+bot.Token, "cert.pem"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	updates := bot.ListenForWebhook("/" + bot.Token)
+	go http.ListenAndServeTLS("0.0.0.0:8443", "cert.pem", "key.pem", nil)
 	for update:=range updates{
 		if update.Message==nil{
 			//User pressed the button
@@ -81,6 +93,11 @@ func init(){
 	addQuestions()
 
 	Quizes = []Quiz{}
+	var err error
+	//db, err = sql.Open("sqlite3",":memory")
+	if err!=nil{
+		log.Fatal(err)
+	}
 }
 func addLocations(){
 	chorsu:=Destination{Location:tgbotapi.Location{ Latitude:41.326721,Longitude:69.235122}, Name:"Chorsu"}
@@ -108,7 +125,7 @@ func hsin(theta float64) float64 {
 	return math.Pow(math.Sin(theta/2), 2)
 }
 
-// Distance function returns the distance (in meters) between two points of
+/* Distance function returns the distance (in meters) between two points of
 //     a given longitude and latitude relatively accurately (using a spherical
 //     approximation of the Earth) through the Haversin Distance Formula for
 //     great arc distance on a sphere with accuracy for small distances
@@ -116,7 +133,7 @@ func hsin(theta float64) float64 {
 // point coordinates are supplied in degrees and converted into rad. in the func
 //
 // distance returned is METERS!!!!!!
-// http://en.wikipedia.org/wiki/Haversine_formula
+// http://en.wikipedia.org/wiki/Haversine_formula*/
 func distance(l1,l2 tgbotapi.Location) float64 {
 	lat1:=l1.Latitude
 	lon1:=l1.Longitude
@@ -171,8 +188,9 @@ func ReceiveLocation(update tgbotapi.Update) (one tgbotapi.MessageConfig,two tgb
 	}
 
 	msg:=tgbotapi.NewMessage(update.Message.Chat.ID,"The nearest location to you is : "+obj.Name)
-	ms:=tgbotapi.NewLocation(update.Message.Chat.ID,obj.Location.Latitude,obj.Location.Longitude)
-	return msg,ms
+	loc:=tgbotapi.NewLocation(update.Message.Chat.ID,obj.Location.Latitude,obj.Location.Longitude)
+	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+	return msg,loc
 }
 
 func ChosenMaterial(update tgbotapi.Update, chosenMaterial *int) tgbotapi.MessageConfig{
@@ -221,9 +239,9 @@ func OnButtonPressed(update tgbotapi.Update,chosenMaterial *int) tgbotapi.Messag
 		msg.ReplyMarkup = kb
 		return msg
 	case "find_place":
-		var menuKeyboard = tgbotapi.NewInlineKeyboardMarkup(
-			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("I agree","agree")))
+		var menuKeyboard = tgbotapi.NewReplyKeyboard(
+			tgbotapi.NewKeyboardButtonRow(
+				tgbotapi.NewKeyboardButtonLocation("I agree")))
 		msg :=tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID,"Do you agree to send me your location?")
 		msg.ReplyMarkup = menuKeyboard
 		return msg
@@ -232,13 +250,16 @@ func OnButtonPressed(update tgbotapi.Update,chosenMaterial *int) tgbotapi.Messag
 		msg:=tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID,"Enter width and height. Separate with comma (,):")
 		return msg
 	case "take_quiz":{
+		//TODO:Check if the user is currently taking a quiz
 		nQuiz:=Quiz{Points:0,ChatID:update.CallbackQuery.Message.Chat.ID,NumberOfQuestions:0,Questions:[]Question{}}
 		Quizes=append(Quizes,nQuiz)
 		return GiveQuestion(&nQuiz)
 	}
 	default:
 		//We have got an answer
+
 		msg:=tgbotapi.NewMessage(update.CallbackQuery.Message.Chat.ID,update.CallbackQuery.Data)
+		//TODO:Remove quiz from slice when it is done
 		return msg
 	}
 }
@@ -260,3 +281,5 @@ func GiveQuestion(quiz *Quiz) tgbotapi.MessageConfig {
 			tgbotapi.NewInlineKeyboardButtonData(q.answerFour, "ans_"+fmt.Sprint(quiz.NumberOfQuestions)+"_4")))
 	return msg
 }
+
+
