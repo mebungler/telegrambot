@@ -53,7 +53,7 @@ func main(){
 	}
 	chosenMaterial:=-1
 	bot.Debug = true
-	_, err = bot.SetWebhook(tgbotapi.NewWebhookWithCert("https://www.google.com:8443/"+bot.Token, "cert.pem"))
+	_, err = bot.SetWebhook(tgbotapi.NewWebhookWithCert("https://www.google.com:8443/"+"504794894:AAEFMJO23cydExR-aZ02SMCSLABbsjcdq-8", "cert.pem"))
 	if err != nil {
 		log.Fatal(err)
 	}
